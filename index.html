@@ -24,7 +24,7 @@
             height: 100vh;
         }
 
-        /* 左側の操作パネル */
+        /* ===== 左側の操作パネル ===== */
         .controls {
             width: 300px;
             background: #333;
@@ -89,7 +89,7 @@
             color: #000;
         }
 
-        /* 右側のプレビューエリア */
+        /* ===== 右側のプレビューエリア ===== */
         .preview-area {
             flex-grow: 1;
             display: flex;
@@ -97,11 +97,19 @@
             overflow: auto;
         }
 
-        .preview-wrapper {
+        /* スケーリング用の外側コンテナ：実際に表示される大きさを持つ */
+        .preview-outer {
             margin: auto;
+            overflow: hidden;
+            flex-shrink: 0;
         }
 
-        /* 賞状の用紙設定 */
+        /* 賞状ラッパー：transform-originをtop leftにしてscaleする */
+        .preview-wrapper {
+            transform-origin: top left;
+        }
+
+        /* ===== 賞状の用紙設定 ===== */
         .certificate {
             width: var(--paper-width);
             height: var(--paper-height);
@@ -307,15 +315,45 @@
             letter-spacing: 0.3rem;
         }
 
-        /* 印刷時のスタイル設定 */
+        /* ===== 印刷時のスタイル設定 ===== */
         @media print {
             @page {
                 size: A3 landscape;
                 margin: 0;
             }
-            body { height: auto; display: block; background: white; margin: 0; padding: 0; }
+            html, body {
+                width: var(--paper-width);
+                height: var(--paper-height);
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+                background: white;
+                display: block;
+            }
             .controls { display: none; }
-            .preview-area { display: block; padding: 0; margin: 0; overflow: hidden; }
+            .panel-toggle-btn { display: none; }
+            .preview-area {
+                display: block;
+                padding: 0;
+                margin: 0;
+                width: var(--paper-width);
+                height: var(--paper-height);
+                overflow: hidden;
+            }
+            /* JSでセットされたインラインサイズをリセットしてA3原寸に戻す */
+            .preview-outer {
+                width: var(--paper-width) !important;
+                height: var(--paper-height) !important;
+                margin: 0 !important;
+                overflow: hidden;
+            }
+            .preview-wrapper {
+                transform: none !important;
+                width: var(--paper-width) !important;
+                height: var(--paper-height) !important;
+                margin: 0 !important;
+                overflow: hidden;
+            }
             .certificate {
                 box-shadow: none;
                 width: var(--paper-width);
@@ -323,12 +361,7 @@
                 margin: 0;
                 overflow: hidden;
                 page-break-after: avoid;
-            }
-            .preview-wrapper {
-                transform: none !important;
-                margin: 0 !important;
-                width: 100%;
-                height: 100%;
+                break-after: avoid;
             }
             .border-frame {
                 display: block !important;
@@ -336,12 +369,126 @@
                 print-color-adjust: exact;
             }
         }
+
+        /* ===== モバイル対応 ===== */
+
+        /* パネル開閉ボタン（デスクトップでは非表示） */
+        .panel-toggle-btn {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                height: 100dvh;
+                overflow: hidden;
+            }
+
+            /* パネル開閉ボタン */
+            .panel-toggle-btn {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                position: fixed;
+                top: 12px;
+                right: 12px;
+                z-index: 100;
+                background: var(--gold-color);
+                color: #000;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 14px;
+                font-size: 0.85rem;
+                font-weight: bold;
+                cursor: pointer;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            }
+
+            .panel-toggle-btn .btn-icon {
+                font-size: 1.1rem;
+                line-height: 1;
+            }
+
+            /* コントロールパネル：モバイルでは上にスライドするオーバーレイ */
+            .controls {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                z-index: 90;
+                transform: translateY(-100%);
+                transition: transform 0.3s ease;
+                padding: 16px 16px 100px 16px;
+                border-radius: 0;
+            }
+
+            .controls.panel-open {
+                transform: translateY(0);
+            }
+
+            .controls h2 {
+                font-size: 1.1rem;
+                margin-top: 8px;
+                margin-bottom: 12px;
+                padding-top: 40px; /* ボタンとの重なり防止 */
+            }
+
+            .input-group {
+                margin-bottom: 12px;
+            }
+
+            .input-group input,
+            .input-group textarea {
+                font-size: 16px; /* iOSのズーム防止 */
+                padding: 10px;
+            }
+
+            .mode-select span {
+                padding: 10px;
+                font-size: 0.9rem;
+            }
+
+            button.print-btn {
+                padding: 14px;
+                font-size: 1rem;
+                margin-top: 10px;
+            }
+
+            /* プレビューエリアは画面全体を使う */
+            .preview-area {
+                flex-grow: 1;
+                padding: 12px;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .preview-outer {
+                margin: 0;
+            }
+        }
+
+        /* 非常に狭い画面向け */
+        @media (max-width: 480px) {
+            .preview-area {
+                padding: 8px;
+            }
+        }
     </style>
 </head>
 <body>
 
+    <!-- モバイル用パネル開閉ボタン -->
+    <button class="panel-toggle-btn" id="panelToggleBtn" onclick="togglePanel()">
+        <span class="btn-icon">✏️</span>
+        <span id="panelBtnLabel">入力パネルを開く</span>
+    </button>
+
     <!-- 操作パネル -->
-    <div class="controls">
+    <div class="controls" id="controlsPanel">
         <h2>賞状作成</h2>
         
         <!-- モード選択 (UI変更・移動) -->
@@ -405,9 +552,11 @@
     </div>
 
     <!-- プレビュー（賞状本体） -->
-    <div class="preview-area">
-        <!-- 縮小表示用のラッパー -->
-        <div class="preview-wrapper">
+    <div class="preview-area" id="previewArea">
+        <!-- 実際に表示される大きさを持つ外側コンテナ -->
+        <div class="preview-outer" id="previewOuter">
+            <!-- 縮小表示用のラッパー -->
+            <div class="preview-wrapper" id="previewWrapper">
             <div class="certificate">
                 <div class="border-frame"></div>
                 
@@ -438,11 +587,73 @@
                     <div class="cert-sender" id="dispSender">代表取締役 佐藤 次郎</div>
                 </div>
             </div>
-        </div>
+        </div><!-- /.preview-wrapper -->
+        </div><!-- /.preview-outer -->
     </div>
 
     <script>
-        // 入力値と表示を同期させるスクリプト
+        // ===== パネル開閉 =====
+        let panelOpen = false;
+
+        function togglePanel() {
+            panelOpen = !panelOpen;
+            const panel = document.getElementById('controlsPanel');
+            const label = document.getElementById('panelBtnLabel');
+            if (panelOpen) {
+                panel.classList.add('panel-open');
+                label.textContent = '閉じる';
+            } else {
+                panel.classList.remove('panel-open');
+                label.textContent = '入力パネルを開く';
+            }
+        }
+
+        // パネルの外をタップしたら閉じる
+        document.getElementById('previewArea').addEventListener('click', function() {
+            if (panelOpen && window.innerWidth <= 768) {
+                panelOpen = false;
+                document.getElementById('controlsPanel').classList.remove('panel-open');
+                document.getElementById('panelBtnLabel').textContent = '入力パネルを開く';
+            }
+        });
+
+        // ===== 賞状スケーリング =====
+        // A3横: 420mm x 297mm
+        const CERT_WIDTH_PX  = Math.round(420 * 3.7795); // ≈ 1587px
+        const CERT_HEIGHT_PX = Math.round(297 * 3.7795); // ≈ 1122px
+
+        function scaleCertificate() {
+            const outer   = document.getElementById('previewOuter');
+            const wrapper = document.getElementById('previewWrapper');
+            const area    = document.getElementById('previewArea');
+
+            // 利用可能なエリアサイズ（paddingを除く）
+            const style   = getComputedStyle(area);
+            const padH    = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+            const padV    = parseFloat(style.paddingTop)  + parseFloat(style.paddingBottom);
+            const areaW   = area.clientWidth  - padH;
+            const areaH   = area.clientHeight - padV;
+
+            // 収まるスケールを計算（最大1倍＝拡大しない）
+            const scale = Math.min(areaW / CERT_WIDTH_PX, areaH / CERT_HEIGHT_PX, 1);
+
+            // wrapperをscale変換（top leftを基点）
+            wrapper.style.width  = CERT_WIDTH_PX  + 'px';
+            wrapper.style.height = CERT_HEIGHT_PX + 'px';
+            wrapper.style.transform = `scale(${scale})`;
+            wrapper.style.transformOrigin = 'top left';
+
+            // outerのサイズを「スケール後の実寸」に設定し、
+            // layoutがA3原寸を占有しないようにする
+            outer.style.width  = Math.round(CERT_WIDTH_PX  * scale) + 'px';
+            outer.style.height = Math.round(CERT_HEIGHT_PX * scale) + 'px';
+        }
+
+        window.addEventListener('resize', scaleCertificate);
+        window.addEventListener('DOMContentLoaded', scaleCertificate);
+        document.fonts.ready.then(scaleCertificate);
+
+        // ===== 入力値と表示を同期させるスクリプト =====
         const inputs = {
             department: document.getElementById('inputDepartment'),
             rank: document.getElementById('inputRank'),
@@ -560,8 +771,6 @@
         // 3人入力されているかチェックしてスタイルを適用する関数
         function checkThreeRecipients() {
             const isTeam = document.querySelector('input[name="mode"][value="team"]').checked;
-            // 3人目の入力があるか、あるいは単に3人目枠が表示されているかなど、要件に合わせて調整
-            // ここでは「団体戦」かつ「3人目の名前が入力されている」場合に適用します
             if (isTeam && inputs.recipient3.value && inputs.recipient3.value.trim() !== '') {
                 certContainer.classList.add('three-recipients');
             } else {
