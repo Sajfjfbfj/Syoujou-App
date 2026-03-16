@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>賞状作成アプリ (A3・縦書き)</title>
+    <!-- 明朝体フォントの読み込み -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --paper-width: 420mm; /* A3 横 */
+            --paper-height: 297mm;
+            --gold-color: #d4af37;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 左側の操作パネル */
+        .controls {
+            width: 300px;
+            background: #333;
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .controls h2 { margin-top: 0; font-size: 1.2rem; }
+        
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; }
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            border: none;
+        }
+        .input-group textarea { height: 100px; resize: vertical; }
+
+        button.print-btn {
+            background-color: var(--gold-color);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            width: 100%;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button.print-btn:hover { opacity: 0.9; }
+
+        /* モード選択スイッチのスタイル */
+        .mode-select {
+            display: flex;
+            margin-bottom: 20px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .mode-select label {
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            margin: 0;
+            background: #444;
+            color: #ccc;
+        }
+        .mode-select input {
+            display: none;
+        }
+        .mode-select span {
+            display: block;
+            padding: 12px;
+            font-weight: bold;
+        }
+        .mode-select input:checked + span {
+            background: var(--gold-color);
+            color: #000;
+        }
+
+        /* 右側のプレビューエリア */
+        .preview-area {
+            flex-grow: 1;
+            display: flex;
+            padding: 40px;
+            overflow: auto;
+        }
+
+        .preview-wrapper {
+            margin: auto;
+        }
+
+        /* 賞状の用紙設定 */
+        .certificate {
+            width: var(--paper-width);
+            height: var(--paper-height);
+            background: white;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            position: relative;
+            /* 縦書き設定の肝 */
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            font-family: 'Shippori Mincho', serif;
+            box-sizing: border-box;
+            padding: 40mm 50mm; /* 余白 */
+            
+            /* レイアウト調整 */
+            display: flex;
+            flex-direction: column; /* 縦書きなのでcolumnが横方向の配置になります */
+            align-items: center; /* 垂直方向（横書きでいう水平）の中央揃え */
+        }
+
+        /* 飾り枠（CSSで簡易的な金の枠を表現） */
+        .border-frame {
+            position: absolute;
+            top: 0; bottom: 0; left: 0; right: 0;
+            background-image: url('resize_crop_A3-h-n_27dpi_A4.jpeg');
+            background-size: 100% 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 各テキスト要素のスタイル */
+        .cert-title {
+            font-size: 4rem;
+            font-weight: 700;
+            margin-left: 20mm; /* 縦書きなのでマージン方向注意 */
+            letter-spacing: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cert-rank {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin-left: 10mm;
+            align-self: flex-start; /* 上寄せ */
+            padding-top: 20mm;
+            position: relative;
+            z-index: 1;
+            letter-spacing: 0.5rem;
+        }
+
+        /* 部門のスタイル */
+        .cert-department {
+            display: none; /* デフォルト非表示 */
+            font-size: 2rem;
+            font-weight: bold;
+            margin-left: 10mm;
+            align-self: flex-start; /* 上寄せ */
+            padding-top: 20mm;
+            position: relative;
+            z-index: 1;
+            letter-spacing: 0.5rem;
+        }
+
+        /* 順位と名前を囲むラッパー：常時Flexboxにして縦並び（物理的な上下）を制御 */
+        .rank-recipient-wrapper {
+            display: flex;
+            flex-direction: row; /* vertical-rl では Top to Bottom */
+            align-items: center; /* Right to Left の中央揃え */
+            gap: 10mm; /* 順位と名前の間隔 */
+            margin-left: 10mm;
+            z-index: 1;
+        }
+
+        /* ラッパー内の順位・名前コンテナの配置リセット（個別の位置指定を打ち消し） */
+        .rank-recipient-wrapper .cert-rank,
+        .rank-recipient-wrapper .recipients-container {
+            align-self: auto;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 部門がある場合のレイアウト変更 */
+        .certificate.has-department .cert-department {
+            display: block;
+        }
+
+        .certificate.has-department .rank-recipient-wrapper {
+            justify-content: space-between; /* 部門ありの時は上下いっぱいに広げる */
+            align-self: stretch;
+            margin-right: 5mm;
+            gap: 0;
+        }
+
+        /* 部門ありの時の順位フォント調整 */
+        .certificate.has-department .cert-rank {
+            font-size: 2.5rem;
+            padding-top: 20mm; /* 上に余白を追加して下にずらす */
+        }
+
+        /* 名前表示エリア（コンテナ） */
+        .recipients-container {
+            display: flex;
+            flex-direction: column; /* 縦書きモードではこれが「横並び」になります */
+            gap: 20px;
+            align-items: center; /* 名前ごとのセンタリング */
+        }
+
+        .cert-recipient {
+            font-size: 4.5rem;
+            font-weight: bold;
+            letter-spacing: 0.5rem;
+            white-space: nowrap;
+        }
+        .cert-recipient span { margin-top: 20px;}
+
+        /* 大会名が長いときに、名前・順位・部門を右（物理方向）へ少しずらして本文との重なりを防ぐ */
+        .certificate.long-tournament .cert-rank,
+        .certificate.long-tournament .recipients-container,
+        .certificate.long-tournament .cert-department,
+        .certificate.long-tournament .cert-body {
+            transform: translateX(15mm);
+        }
+
+        /* 3名連名の時のスタイル調整 */
+        .certificate.three-recipients .cert-recipient {
+            font-size: 3.0rem; /* 文字サイズを小さくして収まりを良くする */
+        }
+
+        /* 3名連名の時もフッター（主催・贈呈者）を右へ寄せる */
+        .certificate.three-recipients .cert-footer {
+            transform: translateX(10mm);
+        }
+
+        /* 日付は少し左に戻す */
+        .certificate.three-recipients .cert-date {
+            transform: translateX(-18mm);
+        }
+
+        /* チーム名のスタイル */
+        .cert-team {
+            font-size: 3.0rem;
+            font-weight: bold;
+            letter-spacing: 0.3rem;
+            white-space: nowrap;
+        }
+
+        /* フッター（日付・主催・贈呈者）は、さらに右へ大きくずらす */
+        .certificate.long-tournament .cert-footer {
+            transform: translateX(25mm);
+        }
+
+        /* 日付だけは少し左に戻してバランスを取る */
+        .certificate.long-tournament .cert-date {
+            transform: translateX(-15mm);
+        }
+
+        .cert-body {
+            font-size: 3.5rem;
+            font-weight: bold;
+            line-height: 2.0;
+            white-space: pre-wrap; /* 改行を反映 */
+            text-align: justify;
+            margin: 30mm auto 0 auto;
+            position: relative;
+            z-index: 1;
+            letter-spacing: 0.3rem;
+            max-height: 200mm;
+            align-self: flex-start;
+        }
+
+        .cert-footer {
+            display: flex;
+            flex-direction: column; /* 縦書き内の横並び */
+            align-items: flex-end; /* 下寄せ（縦書きの左側） */
+            gap: 15mm;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cert-date {
+            font-size: 2.5rem;
+            position: relative;
+            top: -70mm;
+            letter-spacing: 0.3rem;
+        }
+
+        .cert-organization {
+            font-size: 3.0rem;
+            position: relative;
+            top: -20mm; /* 上に移動 */
+            right: 10mm; /* 左にずらす */
+            font-weight: bold;
+            letter-spacing: 0.3rem;
+        }
+
+        .cert-sender {
+            font-size: 3rem;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+            top: 10mm; /* 上に移動 */
+            letter-spacing: 0.3rem;
+        }
+
+        /* 印刷時のスタイル設定 */
+        @media print {
+            @page {
+                size: A3 landscape;
+                margin: 0;
+            }
+            body { height: auto; display: block; background: white; margin: 0; padding: 0; }
+            .controls { display: none; }
+            .preview-area { display: block; padding: 0; margin: 0; overflow: hidden; }
+            .certificate {
+                box-shadow: none;
+                width: var(--paper-width);
+                height: var(--paper-height);
+                margin: 0;
+                overflow: hidden;
+                page-break-after: avoid;
+            }
+            .preview-wrapper {
+                transform: none !important;
+                margin: 0 !important;
+                width: 100%;
+                height: 100%;
+            }
+            .border-frame {
+                display: block !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 操作パネル -->
+    <div class="controls">
+        <h2>賞状作成</h2>
+        
+        <!-- モード選択 (UI変更・移動) -->
+        <div class="mode-select">
+            <label>
+                <input type="radio" name="mode" value="single" checked onchange="toggleMode()">
+                <span>個人戦</span>
+            </label>
+            <label>
+                <input type="radio" name="mode" value="team" onchange="toggleMode()">
+                <span>団体戦</span>
+            </label>
+        </div>
+
+        <div class="input-group">
+            <label>部門</label>
+            <input type="text" id="inputDepartment" placeholder="例：男子の部">
+        </div>
+        <div class="input-group">
+            <label>順位</label>
+            <input type="text" id="inputRank" value="優勝">
+        </div>
+        <div class="input-group">
+            <div class="input-group team-only" style="display:none;">
+                <label>チーム名</label>
+                <input type="text" id="inputTeamName" placeholder="例：チームA">
+            </div>
+            <label>受賞者名1</label>
+            <input type="text" id="inputRecipient1" value="山田 太郎">
+        </div>
+        <div class="input-group team-only" style="display:none;">
+            <label>受賞者名2</label>
+            <input type="text" id="inputRecipient2" placeholder="二人目の名前">
+        </div>
+        <div class="input-group team-only" style="display:none;">
+            <label>受賞者名3</label>
+            <input type="text" id="inputRecipient3" placeholder="三人目の名前">
+        </div>
+
+        <div class="input-group">
+            <label>本文：主催者</label>
+            <input type="text" id="inputOrganizerName" placeholder="例：日本将棋連盟">
+        </div>
+        <div class="input-group">
+            <label>本文：大会名</label>
+            <input type="text" id="inputTournamentName" placeholder="例：竜王戦">
+        </div>
+        <div class="input-group">
+            <label>日付</label>
+            <input type="text" id="inputDate" value="令和六年五月一日">
+        </div>
+        <div class="input-group">
+            <label>主催団体</label>
+            <input type="text" id="inputOrganization" value="株式会社 サンプル">
+        </div>
+        <div class="input-group">
+            <label>贈呈者</label>
+            <input type="text" id="inputSender" value="代表取締役 佐藤 次郎">
+        </div>
+        <button class="print-btn" onclick="window.print()">印刷</button>
+    </div>
+
+    <!-- プレビュー（賞状本体） -->
+    <div class="preview-area">
+        <!-- 縮小表示用のラッパー -->
+        <div class="preview-wrapper">
+            <div class="certificate">
+                <div class="border-frame"></div>
+                
+                <div class="cert-title">表彰状</div>
+                
+                <div class="cert-department" id="dispDepartment"></div>
+                
+                <div class="rank-recipient-wrapper">
+                    <div class="cert-rank" id="dispRank">優勝</div>
+                    
+                    <div class="cert-team" id="dispTeamName" style="display:none;"></div>
+
+                    <div class="recipients-container">
+                        <div class="cert-recipient"><span id="dispRecipient1">山田 太郎</span></div>
+                        <div class="cert-recipient" id="divRecipient2" style="display:none;"><span id="dispRecipient2"></span></div>
+                        <div class="cert-recipient" id="divRecipient3" style="display:none;"><span id="dispRecipient3"></span></div>
+                    </div>
+                </div>
+                
+                <div class="cert-body" id="dispBody">右は○○主催
+○○大会において
+頭書の成績を収めたので
+ここにこれを賞します</div>
+                
+                <div class="cert-footer">
+                    <div class="cert-date" id="dispDate">令和六年五月一日</div>
+                    <div class="cert-organization" id="dispOrganization">株式会社 サンプル</div>
+                    <div class="cert-sender" id="dispSender">代表取締役 佐藤 次郎</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 入力値と表示を同期させるスクリプト
+        const inputs = {
+            department: document.getElementById('inputDepartment'),
+            rank: document.getElementById('inputRank'),
+            teamName: document.getElementById('inputTeamName'),
+            recipient1: document.getElementById('inputRecipient1'),
+            recipient2: document.getElementById('inputRecipient2'),
+            recipient3: document.getElementById('inputRecipient3'),
+            organizerName: document.getElementById('inputOrganizerName'),
+            tournamentName: document.getElementById('inputTournamentName'),
+            date: document.getElementById('inputDate'),
+            organization: document.getElementById('inputOrganization'),
+            sender: document.getElementById('inputSender')
+        };
+
+        const displays = {
+            department: document.getElementById('dispDepartment'),
+            rank: document.getElementById('dispRank'),
+            teamName: document.getElementById('dispTeamName'),
+            recipient1: document.getElementById('dispRecipient1'),
+            recipient2: document.getElementById('dispRecipient2'),
+            recipient3: document.getElementById('dispRecipient3'),
+            body: document.getElementById('dispBody'),
+            date: document.getElementById('dispDate'),
+            organization: document.getElementById('dispOrganization'),
+            sender: document.getElementById('dispSender')
+        };
+
+        const certContainer = document.querySelector('.certificate');
+
+        // 本文を更新する関数
+        function updateBody() {
+            const organizer = inputs.organizerName.value || '○○';
+            const tournament = inputs.tournamentName.value || '○○大会';
+            
+            let text;
+            if (tournament.length > 10) {
+                // 長い場合：「において」を使用し、改行せずにつなげる
+                certContainer.classList.add('long-tournament');
+                text = `右は${organizer}主催\n${tournament}において頭書の成績を収めたのでここにこれを賞します`;
+            } else {
+                // 短い場合：「で」を使用し、改行せずにつなげる
+                certContainer.classList.remove('long-tournament');
+                text = `右は${organizer}主催\n${tournament}で頭書の成績を収めたのでここにこれを賞します`;
+            }
+            
+            displays.body.innerText = text;
+        }
+
+        // 団体戦モード切替
+        function toggleMode() {
+            const isTeam = document.querySelector('input[name="mode"][value="team"]').checked;
+            const teamInputs = document.querySelectorAll('.team-only');
+            
+            // 入力欄の表示切替
+            teamInputs.forEach(el => el.style.display = isTeam ? 'block' : 'none');
+
+            // 団体戦の場合は部門入力を隠し、プレビューからも消す
+            if (isTeam) {
+                inputs.department.parentElement.style.display = 'none';
+                certContainer.classList.remove('has-department');
+            } else {
+                inputs.department.parentElement.style.display = 'block';
+                if (inputs.department.value && inputs.department.value.trim() !== '') {
+                    certContainer.classList.add('has-department');
+                }
+            }
+
+            // 団体戦じゃないときは、プレビューの2,3人目を隠す
+            if (!isTeam) {
+                document.getElementById('divRecipient2').style.display = 'none';
+                document.getElementById('divRecipient3').style.display = 'none';
+                displays.teamName.style.display = 'none';
+            } else {
+                // 団体戦に切り替えたときは、すでに入力があれば表示を復帰させる
+                if (inputs.recipient2.value) document.getElementById('divRecipient2').style.display = 'block';
+                if (inputs.recipient3.value) document.getElementById('divRecipient3').style.display = 'block';
+                if (inputs.teamName.value) displays.teamName.style.display = 'block';
+            }
+            checkThreeRecipients();
+        }
+
+        // イベントリスナーを一括登録
+        Object.keys(inputs).forEach(key => {
+            inputs[key].addEventListener('input', (e) => {
+                if (key === 'organizerName' || key === 'tournamentName') {
+                    updateBody();
+                } else {
+                    displays[key].innerText = e.target.value;
+                }
+
+                // 名前2, 3の入力があれば表示エリアを出す
+                if (key === 'recipient2') {
+                    document.getElementById('divRecipient2').style.display = e.target.value ? 'block' : 'none';
+                }
+                if (key === 'recipient3') {
+                    document.getElementById('divRecipient3').style.display = e.target.value ? 'block' : 'none';
+                    checkThreeRecipients();
+                }
+
+                if (key === 'teamName') {
+                    displays.teamName.style.display = e.target.value ? 'block' : 'none';
+                }
+                
+                // 部門の入力有無チェック
+                if (key === 'department') {
+                    if (e.target.value && e.target.value.trim() !== '') {
+                        certContainer.classList.add('has-department');
+                    } else {
+                        certContainer.classList.remove('has-department');
+                    }
+                }
+            });
+        });
+
+        // 3人入力されているかチェックしてスタイルを適用する関数
+        function checkThreeRecipients() {
+            const isTeam = document.querySelector('input[name="mode"][value="team"]').checked;
+            // 3人目の入力があるか、あるいは単に3人目枠が表示されているかなど、要件に合わせて調整
+            // ここでは「団体戦」かつ「3人目の名前が入力されている」場合に適用します
+            if (isTeam && inputs.recipient3.value && inputs.recipient3.value.trim() !== '') {
+                certContainer.classList.add('three-recipients');
+            } else {
+                certContainer.classList.remove('three-recipients');
+            }
+        }
+    </script>
+</body>
+</html>

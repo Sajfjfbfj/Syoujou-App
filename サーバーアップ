@@ -1,0 +1,15 @@
+echo "# Syoujou-App" >> README.md 
+git init 
+git add README.md 
+git commit -m "first commit" 
+git branch -M main 
+git remote add origin https://github.com/Sajfjfbfj/Syoujou-App.git
+ git push -u origin main
+
+git pull origin main
+
+git add .
+
+git commit -m "アプリ更新"
+
+git push origin main
