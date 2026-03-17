@@ -48,6 +48,21 @@
         }
         .input-group textarea { height: 100px; resize: vertical; }
 
+        .input-notice {
+            margin-top: 6px;
+            padding: 7px 10px;
+            background-color: #fff3cd;
+            border-left: 4px solid #f0ad4e;
+            border-radius: 3px;
+            color: #7a5000;
+            font-size: 0.78rem;
+            line-height: 1.6;
+        }
+        .input-notice-example {
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+
         button.print-btn {
             background-color: var(--gold-color);
             color: #000;
@@ -179,7 +194,7 @@
             flex-direction: row; /* vertical-rl では Top to Bottom */
             align-items: center; /* Right to Left の中央揃え */
             gap: 10mm; /* 順位と名前の間隔 */
-            margin-left: 10mm;
+            margin-left: 20mm; /* デフォルトでタイトルと左端を揃える */
             z-index: 1;
         }
 
@@ -199,6 +214,7 @@
         .certificate.has-department .rank-recipient-wrapper {
             justify-content: space-between; /* 部門ありの時は上下いっぱいに広げる */
             align-self: stretch;
+            margin-left: 10mm; /* 部門がある場合はインデントを部門に合わせる */
             margin-right: 5mm;
             gap: 0;
         }
@@ -207,6 +223,11 @@
         .certificate.has-department .cert-rank {
             font-size: 2.5rem;
             padding-top: 20mm; /* 上に余白を追加して下にずらす */
+        }
+
+        /* 部門あり時は本文をさらに右へ寄せる */
+        .certificate.has-department .cert-body {
+            transform: translateX(20mm);
         }
 
         /* 名前表示エリア（コンテナ） */
@@ -225,12 +246,31 @@
         }
         .cert-recipient span { margin-top: 20px;}
 
-        /* 大会名が長いときに、名前・順位・部門を右（物理方向）へ少しずらして本文との重なりを防ぐ */
+        /* 大会名が長いときに、名前・順位・部門を右へずらして本文との重なりを防ぐ */
         .certificate.long-tournament .cert-rank,
         .certificate.long-tournament .recipients-container,
-        .certificate.long-tournament .cert-department,
-        .certificate.long-tournament .cert-body {
+        .certificate.long-tournament .cert-department {
             transform: translateX(15mm);
+        }
+
+        /* 本文は名前列より少し多めに右へ寄せて左への食み出しを抑える */
+        .certificate.long-tournament .cert-body {
+            transform: translateX(25mm);
+        }
+
+        /* 本文が長い場合はフッターも本文に合わせて右へずらす */
+        .certificate.long-tournament .cert-footer {
+            transform: translateX(25mm);
+        }
+
+        /* 部門あり・本文長い場合は、部門の押し出し分を考慮してフッターをさらに右へ配置 */
+        .certificate.long-tournament.has-department .cert-footer {
+            transform: translateX(35mm);
+        }
+
+        /* 上記条件の時、日付だけは少し左（本文寄り）に戻す */
+        .certificate.long-tournament.has-department .cert-date {
+            transform: translateX(-10mm);
         }
 
         /* 3名連名の時のスタイル調整 */
@@ -240,13 +280,15 @@
 
         /* 3名連名の時もフッター（主催・贈呈者）を右へ寄せる */
         .certificate.three-recipients .cert-footer {
-            transform: translateX(10mm);
+            transform: translateX(35mm);
         }
 
-        /* 日付は少し左に戻す */
-        .certificate.three-recipients .cert-date {
-            transform: translateX(-18mm);
+        /* 3名連名の時は本文も右へ寄せる */
+        .certificate.three-recipients .cert-body {
+            transform: translateX(35mm);
         }
+
+        /* cert-date は cert-footer のフロー内なので footer の translateX で一緒に動く。個別指定不要 */
 
         /* チーム名のスタイル */
         .cert-team {
@@ -256,23 +298,13 @@
             white-space: nowrap;
         }
 
-        /* フッター（日付・主催・贈呈者）は、さらに右へ大きくずらす */
-        .certificate.long-tournament .cert-footer {
-            transform: translateX(25mm);
-        }
-
-        /* 日付だけは少し左に戻してバランスを取る */
-        .certificate.long-tournament .cert-date {
-            transform: translateX(-15mm);
-        }
-
         .cert-body {
             font-size: 3.5rem;
             font-weight: bold;
             line-height: 2.0;
             white-space: pre-wrap; /* 改行を反映 */
             text-align: justify;
-            margin: 30mm auto 0 auto;
+            margin: 30mm 15mm 0 auto; /* right=15mmに固定して右寄り */
             position: relative;
             z-index: 1;
             letter-spacing: 0.3rem;
@@ -287,32 +319,36 @@
             gap: 15mm;
             position: relative;
             z-index: 1;
+            transform: translateX(5mm); /* デフォルトの位置（本文短い時） */
+            flex-grow: 1; /* 残りのスペースを埋めることで高さを安定させ、中央揃えによるズレを防ぐ */
         }
 
+        /* 日付は cert-footer のフロー内に置き align-self で上寄せ。
+           cert-footer ごと translateX すれば日付も一緒に動く。
+           贈呈者の文字数変化は別列なので日付の縦位置に影響しない。 */
         .cert-date {
             font-size: 2.5rem;
-            position: relative;
-            top: -70mm;
             letter-spacing: 0.3rem;
+            white-space: nowrap;
+            align-self: flex-start;   /* 縦書き内で物理上寄せ（= 縦方向上寄せ） */
+            margin-top: 0;            /* 常に高い位置に固定 */
+            position: relative;
+            z-index: 1;
         }
 
         .cert-organization {
             font-size: 3.0rem;
-            position: relative;
-            top: -20mm; /* 上に移動 */
-            right: 10mm; /* 左にずらす */
             font-weight: bold;
             letter-spacing: 0.3rem;
+            white-space: nowrap;
         }
 
         .cert-sender {
             font-size: 3rem;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            position: relative;
-            top: 10mm; /* 上に移動 */
             letter-spacing: 0.3rem;
+            white-space: nowrap;
+            position: relative;
+            top: 15mm; /* 他の要素に影響を与えずに下へ移動 */
         }
 
         /* ===== 印刷時のスタイル設定 ===== */
@@ -450,7 +486,22 @@
                 font-size: 0.9rem;
             }
 
-            button.print-btn {
+            .input-notice {
+            margin-top: 6px;
+            padding: 7px 10px;
+            background-color: #fff3cd;
+            border-left: 4px solid #f0ad4e;
+            border-radius: 3px;
+            color: #7a5000;
+            font-size: 0.78rem;
+            line-height: 1.6;
+        }
+        .input-notice-example {
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+
+        button.print-btn {
                 padding: 14px;
                 font-size: 1rem;
                 margin-top: 10px;
@@ -543,10 +594,18 @@
         <div class="input-group">
             <label>主催団体</label>
             <input type="text" id="inputOrganization" value="株式会社 サンプル">
+            <div class="input-notice">
+                ⚠️ 団体名の区切りには必ず空欄を入れてください<br>
+                <span class="input-notice-example">例：株式会社 サンプル</span>
+            </div>
         </div>
         <div class="input-group">
             <label>贈呈者</label>
             <input type="text" id="inputSender" value="代表取締役 佐藤 次郎">
+            <div class="input-notice">
+                ⚠️ 役職・姓・名の間には必ず空欄を入れてください<br>
+                <span class="input-notice-example">例：代表取締役 佐藤 次郎</span>
+            </div>
         </div>
         <button class="print-btn" onclick="window.print()">印刷</button>
     </div>
@@ -605,6 +664,8 @@
             } else {
                 panel.classList.remove('panel-open');
                 label.textContent = '入力パネルを開く';
+                // パネルを閉じた瞬間（キーボード収納後）に正しいサイズで再計算
+                setTimeout(scaleCertificate, 300);
             }
         }
 
@@ -614,6 +675,8 @@
                 panelOpen = false;
                 document.getElementById('controlsPanel').classList.remove('panel-open');
                 document.getElementById('panelBtnLabel').textContent = '入力パネルを開く';
+                // パネルを閉じた瞬間（キーボード収納後）に正しいサイズで再計算
+                setTimeout(scaleCertificate, 300);
             }
         });
 
@@ -623,6 +686,9 @@
         const CERT_HEIGHT_PX = Math.round(297 * 3.7795); // ≈ 1122px
 
         function scaleCertificate() {
+            // モバイルでパネルが開いている間はキーボードの影響を無視する
+            if (window.innerWidth <= 768 && panelOpen) return;
+
             const outer   = document.getElementById('previewOuter');
             const wrapper = document.getElementById('previewWrapper');
             const area    = document.getElementById('previewArea');
@@ -683,22 +749,28 @@
 
         const certContainer = document.querySelector('.certificate');
 
-        // 本文を更新する関数
+        // 本文を更新する関数（主催者名・大会名のどちらかが長ければlong-tournamentを付与）
         function updateBody() {
             const organizer = inputs.organizerName.value || '○○';
             const tournament = inputs.tournamentName.value || '○○大会';
-            
+            const isLong = tournament.length > 10 || organizer.length > 8;
+
             let text;
             if (tournament.length > 10) {
-                // 長い場合：「において」を使用し、改行せずにつなげる
-                certContainer.classList.add('long-tournament');
+                // 大会名が長い場合：「において」を使用
                 text = `右は${organizer}主催\n${tournament}において頭書の成績を収めたのでここにこれを賞します`;
             } else {
-                // 短い場合：「で」を使用し、改行せずにつなげる
-                certContainer.classList.remove('long-tournament');
+                // 短い場合：「で」を使用
                 text = `右は${organizer}主催\n${tournament}で頭書の成績を収めたのでここにこれを賞します`;
             }
-            
+
+            // 主催者名・大会名のどちらかが長ければフッターをずらすクラスを付与
+            if (isLong) {
+                certContainer.classList.add('long-tournament');
+            } else {
+                certContainer.classList.remove('long-tournament');
+            }
+
             displays.body.innerText = text;
         }
 
