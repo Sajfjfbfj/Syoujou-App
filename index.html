@@ -8,7 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
-    
     <style>
         :root {
             --paper-width: 420mm; /* A3 横 */
@@ -74,6 +73,19 @@
             margin-top: 20px;
         }
         button.print-btn:hover { opacity: 0.9; }
+
+        button.pdf-btn {
+            background-color: #28a745; /* PDFボタンは緑色で区別 */
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            width: 100%;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button.pdf-btn:hover { opacity: 0.9; }
+        button.pdf-btn:disabled { background-color: #ccc; cursor: not-allowed; }
 
         /* モード選択スイッチのスタイル */
         .mode-select {
@@ -173,6 +185,8 @@
             position: relative;
             z-index: 1;
             letter-spacing: 0.5rem;
+            writing-mode: vertical-rl;   /* horizontal-tb のラッパー内で縦書きを明示 */
+            text-orientation: upright;
         }
 
         /* 部門のスタイル */
@@ -189,10 +203,14 @@
         }
 
         /* 順位と名前を囲むラッパー：常時Flexboxにして縦並び（物理的な上下）を制御 */
+        /* writing-mode: horizontal-tb を明示して flex 挙動を安定させる。
+           チーム名・受賞者名が増えた際に vertical-rl × row の挙動がブラウザ間でずれるのを防ぐ。
+           子要素（cert-rank, cert-team, recipients-container）に個別に writing-mode を再指定する。 */
         .rank-recipient-wrapper {
             display: flex;
-            flex-direction: row; /* vertical-rl では Top to Bottom */
-            align-items: center; /* Right to Left の中央揃え */
+            writing-mode: horizontal-tb; /* flex の主軸方向をブラウザ間で確実に固定する */
+            flex-direction: column; /* horizontal-tb では column = 物理的に上から下 */
+            align-items: center; /* 物理的な水平方向の中央揃え */
             gap: 10mm; /* 順位と名前の間隔 */
             margin-left: 20mm; /* デフォルトでタイトルと左端を揃える */
             z-index: 1;
@@ -230,12 +248,36 @@
             transform: translateX(20mm);
         }
 
+        /* 個人戦・部門なしの場合、順位と名前の間隔を広げる */
+        .certificate:not(.has-department):not(.team-mode) .rank-recipient-wrapper {
+            gap: 30mm; /* 間隔を広げる（元は10mm） */
+            transform: translateY(10mm); /* gap増加分を補正して順位の絶対位置を維持し、名前だけ下げる */
+        }
+
+        /* 個人戦・部門なしの場合、本文を少し右へ寄せる（大会名が長い場合はそちらのスタイル優先） */
+        .certificate:not(.has-department):not(.team-mode):not(.long-tournament) .cert-body {
+            transform: translateX(10mm);
+        }
+
         /* 名前表示エリア（コンテナ） */
         .recipients-container {
             display: flex;
+            writing-mode: vertical-rl;   /* horizontal-tb のラッパー内で縦書きを明示 */
+            text-orientation: upright;
             flex-direction: column; /* 縦書きモードではこれが「横並び」になります */
             gap: 20px;
             align-items: center; /* 名前ごとのセンタリング */
+        }
+
+        /* 団体戦の場合、受賞者名の開始位置を少し下げる */
+        .certificate.team-mode .recipients-container {
+            margin-top: 15mm;
+        }
+
+        /* 団体戦の場合、順位とチーム名も少し下げる */
+        .certificate.team-mode .cert-rank,
+        .certificate.team-mode .cert-team {
+            margin-top: 10mm;
         }
 
         .cert-recipient {
@@ -243,13 +285,16 @@
             font-weight: bold;
             letter-spacing: 0.5rem;
             white-space: nowrap;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
         }
         .cert-recipient span { margin-top: 20px;}
 
         /* 大会名が長いときに、名前・順位・部門を右へずらして本文との重なりを防ぐ */
         .certificate.long-tournament .cert-rank,
         .certificate.long-tournament .recipients-container,
-        .certificate.long-tournament .cert-department {
+        .certificate.long-tournament .cert-department,
+        .certificate.long-tournament .cert-team { /* チーム名も一緒にずらす */
             transform: translateX(15mm);
         }
 
@@ -273,19 +318,47 @@
             transform: translateX(-10mm);
         }
 
-        /* 3名連名の時のスタイル調整 */
-        .certificate.three-recipients .cert-recipient {
+        /* 複数名（2名以上）連名の時のスタイル調整 */
+        .certificate.multi-recipients .cert-recipient {
             font-size: 3.0rem; /* 文字サイズを小さくして収まりを良くする */
         }
 
-        /* 3名連名の時もフッター（主催・贈呈者）を右へ寄せる */
+        .certificate.multi-recipients .rank-recipient-wrapper {
+            transform: translateX(10mm);
+        }
+
+        /* 複数名（2名以上）連名の時、フッターを少し右へ寄せる */
+        .certificate.multi-recipients .cert-footer {
+            transform: translateX(15mm);
+        }
+
+        /* 本文はさらに右へ寄せる（25mm） */
+        .certificate.multi-recipients .cert-body {
+            transform: translateX(25mm);
+        }
+
+        /* 複数名連名 かつ 大会名が長い場合の調整 */
+        .certificate.long-tournament.multi-recipients .cert-footer {
+            transform: translateX(30mm);
+        }
+        .certificate.long-tournament.multi-recipients .cert-body {
+            transform: translateX(40mm);
+        }
+
+        /* 3名連名の時だけフッター（主催・贈呈者）を右へ寄せる */
         .certificate.three-recipients .cert-footer {
             transform: translateX(35mm);
         }
 
-        /* 3名連名の時は本文も右へ寄せる */
+        /* 3名連名の時だけ本文も右へ寄せる */
         .certificate.three-recipients .cert-body {
             transform: translateX(35mm);
+        }
+
+        /* 3名連名 かつ 大会名が長い場合の追加調整 */
+        .certificate.long-tournament.three-recipients .cert-body,
+        .certificate.long-tournament.three-recipients .cert-footer {
+            transform: translateX(50mm); /* さらに右へずらす */
         }
 
         /* cert-date は cert-footer のフロー内なので footer の translateX で一緒に動く。個別指定不要 */
@@ -296,6 +369,8 @@
             font-weight: bold;
             letter-spacing: 0.3rem;
             white-space: nowrap;
+            writing-mode: vertical-rl;   /* horizontal-tb のラッパー内で縦書きを明示 */
+            text-orientation: upright;
         }
 
         .cert-body {
@@ -321,6 +396,7 @@
             z-index: 1;
             transform: translateX(5mm); /* デフォルトの位置（本文短い時） */
             flex-grow: 1; /* 残りのスペースを埋めることで高さを安定させ、中央揃えによるズレを防ぐ */
+            align-self: stretch; /* 上下いっぱいに広げて、文字数による位置ズレを防ぐ */
         }
 
         /* 日付は cert-footer のフロー内に置き align-self で上寄せ。
@@ -331,7 +407,7 @@
             letter-spacing: 0.3rem;
             white-space: nowrap;
             align-self: flex-start;   /* 縦書き内で物理上寄せ（= 縦方向上寄せ） */
-            margin-top: 0;            /* 常に高い位置に固定 */
+            margin-top: 20mm;         /* 位置を少し下げる */
             position: relative;
             z-index: 1;
         }
@@ -341,14 +417,30 @@
             font-weight: bold;
             letter-spacing: 0.3rem;
             white-space: nowrap;
+            align-self: center;       /* 中央に配置 */
         }
 
         .cert-sender {
             font-size: 3rem;
             letter-spacing: 0.3rem;
             white-space: nowrap;
-            position: relative;
-            top: 15mm; /* 他の要素に影響を与えずに下へ移動 */
+            align-self: center;       /* 中央揃えを基準にする */
+            margin-top: 60mm;         /* マージンで中心位置を下にずらす（真ん中より下へ） */
+        }
+
+        /* 個人戦・部門あり、または団体戦の場合、贈呈者だけを少し右へ寄せる */
+        .certificate.has-department:not(.team-mode) .cert-sender,
+        .certificate.team-mode .cert-sender {
+            transform: translateX(8mm);
+        }
+
+        /* 団体戦で2名以上の場合、主催団体と贈呈者をさらに少し右へずらす */
+        .certificate.multi-recipients .cert-organization {
+            transform: translateX(5mm);
+        }
+
+        .certificate.multi-recipients .cert-sender {
+            transform: translateX(13mm); /* チーム戦の8mm + 5mm */
         }
 
         /* ===== 印刷時のスタイル設定 ===== */
@@ -357,6 +449,11 @@
                 size: A3 landscape;
                 margin: 0;
             }
+            /* 背景画像や色を強制的に出力する設定 */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             html, body {
                 width: var(--paper-width);
                 height: var(--paper-height);
@@ -364,10 +461,10 @@
                 padding: 0;
                 overflow: hidden;
                 background: white;
-                display: block;
+                display: block !important;
             }
-            .controls { display: none; }
-            .panel-toggle-btn { display: none; }
+            .controls { display: none !important; }
+            .panel-toggle-btn { display: none !important; }
             .preview-area {
                 display: block;
                 padding: 0;
@@ -399,6 +496,7 @@
                 page-break-after: avoid;
                 break-after: avoid;
             }
+            /* 通常の印刷時は枠（画像）を消す */
             .border-frame {
                 display: none !important;
             }
@@ -606,6 +704,7 @@
             </div>
         </div>
         <button class="print-btn" onclick="window.print()">印刷</button>
+        <button class="pdf-btn" onclick="savePDF()">PDF保存 (高画質)</button>
     </div>
 
     <!-- プレビュー（賞状本体） -->
@@ -784,11 +883,13 @@
             if (isTeam) {
                 inputs.department.parentElement.style.display = 'none';
                 certContainer.classList.remove('has-department');
+                certContainer.classList.add('team-mode');
             } else {
                 inputs.department.parentElement.style.display = 'block';
                 if (inputs.department.value && inputs.department.value.trim() !== '') {
                     certContainer.classList.add('has-department');
                 }
+                certContainer.classList.remove('team-mode');
             }
 
             // 団体戦じゃないときは、プレビューの2,3人目を隠す
@@ -802,7 +903,7 @@
                 if (inputs.recipient3.value) document.getElementById('divRecipient3').style.display = 'block';
                 if (inputs.teamName.value) displays.teamName.style.display = 'block';
             }
-            checkThreeRecipients();
+            checkMultiRecipients();
         }
 
         // イベントリスナーを一括登録
@@ -817,10 +918,11 @@
                 // 名前2, 3の入力があれば表示エリアを出す
                 if (key === 'recipient2') {
                     document.getElementById('divRecipient2').style.display = e.target.value ? 'block' : 'none';
+                    checkMultiRecipients();
                 }
                 if (key === 'recipient3') {
                     document.getElementById('divRecipient3').style.display = e.target.value ? 'block' : 'none';
-                    checkThreeRecipients();
+                    checkMultiRecipients();
                 }
 
                 if (key === 'teamName') {
@@ -838,14 +940,31 @@
             });
         });
 
-        // 3人入力されているかチェックしてスタイルを適用する関数
-        function checkThreeRecipients() {
+        // 複数名（2名以上）入力されているかチェックしてスタイルを適用する関数
+        function checkMultiRecipients() {
             const isTeam = document.querySelector('input[name="mode"][value="team"]').checked;
-            if (isTeam && inputs.recipient3.value && inputs.recipient3.value.trim() !== '') {
+            // 団体戦かつ、2人目または3人目が入力されている場合
+            const hasMulti = inputs.recipient2.value.trim() !== '' || inputs.recipient3.value.trim() !== '';
+            if (isTeam && hasMulti) {
+                certContainer.classList.add('multi-recipients');
+            } else {
+                certContainer.classList.remove('multi-recipients');
+            }
+
+            // 3人目が入力されている場合（本文位置調整用）
+            if (isTeam && inputs.recipient3.value.trim() !== '') {
                 certContainer.classList.add('three-recipients');
             } else {
                 certContainer.classList.remove('three-recipients');
             }
+        }
+
+        // PDF保存処理（ブラウザ標準機能への誘導）
+        function savePDF() {
+            if (!confirm("【PDF保存の手順】\n\n1. この後開く印刷画面で、送信先を「PDFに保存」に変更してください。\n2. 「保存」ボタンを押すとPDFファイルがダウンロードされます。\n\n※この方法なら画質が劣化せず、文字も綺麗に保存されます。\n\n進みますか？")) return;
+
+            // 印刷ダイアログを開く
+            window.print();
         }
     </script>
 </body>
